@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Stellar Navigator — 100 Stars Relative to the Sun</title>
+  <style>
+    :root {
+      --bg-dark: #070913;
+      --panel-bg: rgba(10, 16, 32, 0.85);
+      --panel-border: rgba(64, 140, 255, 0.35);
+      --accent-blue: #00d2ff;
+      --accent-cyan: #00ffff;
+      --accent-gold: #ffd700;
+      --text-main: #e2e8f0;
+      --text-dim: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text-main);
+    }
+
+    #webgl-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Top Navigation Bar */
+    #top-bar {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+
+    .hud-glass {
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(0, 180, 255, 0.05);
+      pointer-events: auto;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+    }
+
+    .title-group h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-group .badge {
+      background: rgba(0, 210, 255, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 210, 255, 0.4);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+    }
+
+    button.btn {
+      background: rgba(30, 48, 80, 0.6);
+      border: 1px solid rgba(100, 180, 255, 0.3);
+      color: #f1f5f9;
+      padding: 6px 12px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button.btn:hover {
+      background: rgba(0, 180, 255, 0.25);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+      color: #ffffff;
+    }
+
+    button.btn.active {
+      background: rgba(0, 180, 255, 0.4);
+      border-color: var(--accent-cyan);
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(0, 210, 255, 0.5);
+    }
+
+    /* Search Box */
+    .search-wrapper {
+      position: relative;
+    }
+
+    .search-input {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(100, 180, 255, 0.4);
+      border-radius: 6px;
+      padding: 6px 12px 6px 30px;
+      font-size: 12px;
+      color: #fff;
+      width: 190px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      width: 250px;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 12px rgba(0, 210, 255, 0.3);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    .search-results {
+      position: absolute;
+      top: 105%;
+      left: 0;
+      right: 0;
+      max-height: 280px;
+      overflow-y: auto;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      display: none;
+      z-index: 50;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+    }
+
+    .search-item {
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .search-item:hover {
+      background: rgba(0, 180, 255, 0.25);
+      color: #fff;
+    }
+
+    /* Left Sidebar: Settings & Tools */
+    #left-panel {
+      position: absolute;
+      top: 74px;
+      left: 14px;
+      width: 280px;
+      max-height: calc(100% - 100px);
+      overflow-y: auto;
+      z-index: 10;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent-cyan);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 6px;
+      padding: 3px 0;
+    }
+
+    .toggle-row label {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    input[type="checkbox"] {
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }
+
+    .slider-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+
+    .slider-row .slider-label {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-dim);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }
+
+    /* Right Sidebar: Star Telemetry & Inspector */
+    #telemetry-panel {
+      position: absolute;
+      top: 74px;
+      right: 14px;
+      width: 330px;
+      max-height: calc(100% - 100px);
+      overflow-y: auto;
+      z-index: 10;
+      padding: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .target-header {
+      border-bottom: 1px solid rgba(0, 210, 255, 0.3);
+      padding-bottom: 8px;
+      position: relative;
+    }
+
+    .target-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .target-header .bayer {
+      font-size: 12px;
+      color: var(--accent-cyan);
+      margin-top: 2px;
+    }
+
+    .close-btn {
+      position: absolute;
+      right: 0;
+      top: 0;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .close-btn:hover {
+      color: #fff;
+    }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .data-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 4px;
+      padding: 6px 8px;
+    }
+
+    .data-card .label {
+      color: var(--text-dim);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .data-card .val {
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 2px;
+      font-family: monospace;
+    }
+
+    .significance-box {
+      background: rgba(0, 180, 255, 0.08);
+      border-left: 3px solid var(--accent-cyan);
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #e2e8f0;
+      border-radius: 0 4px 4px 0;
+    }
+
+    /* Distance Tool */
+    .ruler-section {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    select.ruler-select {
+      background: #0f172a;
+      border: 1px solid rgba(100, 180, 255, 0.4);
+      color: #fff;
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      width: 100%;
+      outline: none;
+    }
+
+    .ruler-result {
+      padding: 6px 8px;
+      background: rgba(0, 255, 200, 0.1);
+      border: 1px dashed rgba(0, 255, 200, 0.4);
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #a7f3d0;
+      text-align: center;
+    }
+
+    /* Bottom Cockpit / Flight HUD Overlay */
+    #flight-hud {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .flight-crosshair {
+      width: 50px;
+      height: 50px;
+      border: 1.5px dashed rgba(0, 255, 255, 0.45);
+      border-radius: 50%;
+      position: relative;
+      margin-bottom: 6px;
+    }
+
+    .flight-crosshair::before, .flight-crosshair::after {
+      content: '';
+      position: absolute;
+      background: var(--accent-cyan);
+    }
+    .flight-crosshair::before {
+      top: 50%; left: -8px; width: 66px; height: 1px; transform: translateY(-50%);
+    }
+    .flight-crosshair::after {
+      left: 50%; top: -8px; height: 66px; width: 1px; transform: translateX(-50%);
+    }
+
+    .flight-telemetry {
+      display: flex;
+      gap: 16px;
+      padding: 8px 18px;
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--accent-cyan);
+      pointer-events: auto;
+    }
+
+    .flight-instructions {
+      font-size: 11px;
+      color: #94a3b8;
+      background: rgba(0,0,0,0.6);
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    /* Bottom Left Reference Compass */
+    #origin-indicator {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      z-index: 10;
+      padding: 8px 12px;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sun-dot {
+      width: 10px;
+      height: 10px;
+      background: #ffd700;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #ffd700;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.2);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 180, 255, 0.3);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 210, 255, 0.6);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- WebGL 3D Canvas -->
+  <div id="webgl-container"></div>
+
+  <!-- Top Navigation Bar -->
+  <header id="top-bar">
+    <div class="hud-glass title-group">
+      <h1>
+        <span style="color: #ffd700;">☀️</span> 3D Stellar Cartography
+      </h1>
+      <span class="badge">100 Primary Stars</span>
+    </div>
+
+    <!-- Mode Selector & Presets -->
+    <div class="hud-glass controls-group">
+      <button id="btn-mode-orbit" class="btn active" title="Turntable / Pan / Zoom around stars">
+        🛰️ Orbit Mode
+      </button>
+      <button id="btn-mode-flight" class="btn" title="Free spaceflight through the 3D grid">
+        ✈️ Flight Mode
+      </button>
+      <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
+      <button id="btn-frame-eq" class="btn active" title="Equatorial Frame (ICRS J2000)">
+        🌐 Equatorial Frame
+      </button>
+      <button id="btn-frame-gal" class="btn" title="Galactic Plane Frame">
+        🌌 Galactic Frame
+      </button>
+      <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
+      <button id="btn-reset-sun" class="btn" title="Center on Sun at [0, 0, 0]">
+        ☀️ Target Sun
+      </button>
+    </div>
+
+    <!-- Search Box -->
+    <div class="hud-glass controls-group">
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="star-search" class="search-input" placeholder="Search star or HIP / HD...">
+        <div id="search-results" class="search-results"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Left Control Panel -->
+  <aside id="left-panel" class="hud-glass">
+    <div>
+      <div class="section-title">
+        <span>3D Grid & Reference Plane</span>
+      </div>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="chk-solar" checked> 🪐 Basic Solar System (Planets & Orbits)</label>
+      </div>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="chk-grid" checked> Reference Grid Plane (Z = 0)</label>
+      </div>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="chk-stems" checked> Height Stems / Drop Lines</label>
+      </div>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="chk-rings" checked> Heliocentric Distance Rings</label>
+      </div>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="chk-labels" checked> Star Name Labels</label>
+      </div>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="chk-axes" checked> 3D Coordinate Axes (X, Y, Z)</label>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">
+        <span>Camera View Presets</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+        <button id="view-solar-system" class="btn" style="grid-column: span 2; background: rgba(255,215,0,0.18); border-color: rgba(255,215,0,0.5); font-weight: 600;">🪐 Focus Solar System</button>
+        <button id="view-sun-close" class="btn">Local (15 ly)</button>
+        <button id="view-top-down" class="btn">Top-Down (Z+)</button>
+        <button id="view-side-x" class="btn">Side Profile (X+)</button>
+        <button id="view-overview" class="btn">Overview (1000 ly)</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">
+        <span>Visual Settings</span>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label"><span>Planet Orbit Speed</span><span id="lbl-orbit-speed">1.0x</span></div>
+        <input type="range" id="rng-orbit-speed" min="0" max="4.0" step="0.2" value="1.0">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label"><span>Star Core Scale</span><span id="lbl-scale">1.0x</span></div>
+        <input type="range" id="rng-scale" min="0.5" max="3.0" step="0.1" value="1.0">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label"><span>Grid Subdivisions</span><span id="lbl-grid-size">50 ly</span></div>
+        <input type="range" id="rng-grid-size" min="10" max="100" step="10" value="50">
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">
+        <span>Interstellar Distance Tool</span>
+      </div>
+      <div class="ruler-section">
+        <label style="font-size: 11px; color: var(--text-dim);">From:</label>
+        <select id="ruler-star-1" class="ruler-select"></select>
+        <label style="font-size: 11px; color: var(--text-dim);">To:</label>
+        <select id="ruler-star-2" class="ruler-select"></select>
+        <div id="ruler-display" class="ruler-result">Distance: 0.00 ly</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">
+        <span>Filter by Category</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 4px;" id="category-pills">
+        <button class="btn active" data-cat="ALL" style="font-size: 10px; padding: 3px 6px;">All (100)</button>
+        <button class="btn" data-cat="Nearest" style="font-size: 10px; padding: 3px 6px;">Nearest (<15 ly)</button>
+        <button class="btn" data-cat="Brightest" style="font-size: 10px; padding: 3px 6px;">Brightest</button>
+        <button class="btn" data-cat="Navigational" style="font-size: 10px; padding: 3px 6px;">Nav / Polar</button>
+        <button class="btn" data-cat="Extreme" style="font-size: 10px; padding: 3px 6px;">Extreme / Giants</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Telemetry Panel (Star Details) -->
+  <aside id="telemetry-panel" class="hud-glass">
+    <div class="target-header">
+      <button id="close-telemetry" class="close-btn" title="Close">✕</button>
+      <h2 id="star-name">Sirius</h2>
+      <div id="star-bayer" class="bayer">Alpha Canis Majoris</div>
+    </div>
+
+    <div class="data-grid">
+      <div class="data-card">
+        <div class="label">Distance (Sun)</div>
+        <div class="val" id="star-dist">8.60 ly</div>
+      </div>
+      <div class="data-card">
+        <div class="label">Spectral Type</div>
+        <div class="val" id="star-spec">A0mA1Va</div>
+      </div>
+      <div class="data-card">
+        <div class="label">Apparent Mag (V)</div>
+        <div class="val" id="star-vmag">-1.46</div>
+      </div>
+      <div class="data-card">
+        <div class="label">Absolute Mag (M_V)</div>
+        <div class="val" id="star-abs">-1.43</div>
+      </div>
+      <div class="data-card">
+        <div class="label">Constellation</div>
+        <div class="val" id="star-const">Canis Major</div>
+      </div>
+      <div class="data-card">
+        <div class="label">Parallax</div>
+        <div class="val" id="star-plx">379.21 mas</div>
+      </div>
+    </div>
+
+    <div class="data-card" style="width: 100%;">
+      <div class="label">3D Position relative to Sun (ly)</div>
+      <div class="val" id="star-coords" style="font-size: 12px;">X: -1.61, Y: +8.08, Z: -2.47</div>
+    </div>
+
+    <div class="data-card" style="width: 100%;">
+      <div class="label">Celestial Coordinates (J2000)</div>
+      <div class="val" id="star-celestial" style="font-size: 11px;">RA: 06h 45m 08.9s | Dec: -16° 42' 58"</div>
+    </div>
+
+    <div class="significance-box" id="star-notes">
+      Brightest star in Earth's night sky; binary system with white dwarf Sirius B.
+    </div>
+
+    <button id="btn-fly-to" class="btn" style="width: 100%; justify-content: center; padding: 8px; font-weight: 600; background: rgba(0,210,255,0.25); border-color: var(--accent-cyan);">
+      🚀 Warp / Travel to Star
+    </button>
+  </aside>
+
+  <!-- Flight Mode Cockpit HUD -->
+  <div id="flight-hud">
+    <div class="flight-crosshair"></div>
+    <div class="hud-glass flight-telemetry">
+      <div>SPEED: <span id="hud-speed">10.0</span> ly/s</div>
+      <div>HEADING: <span id="hud-heading">045°</span></div>
+      <div>POS: [<span id="hud-x">0.0</span>, <span id="hud-y">0.0</span>, <span id="hud-z">0.0</span>] ly</div>
+    </div>
+    <div class="flight-instructions">
+      <b>Flight Controls:</b> [W/S] Pitch / Forward &bull; [A/D] Yaw / Steer &bull; [Space/C] Ascend/Descend &bull; [Shift] Boost Throttle &bull; [Mouse Drag] Aim
+    </div>
+  </div>
+
+  <!-- Origin Indicator -->
+  <div id="origin-indicator" class="hud-glass">
+    <div class="sun-dot"></div>
+    <span>SOL (Sun) Origin: [0.0, 0.0, 0.0]</span>
+  </div>
+
+  <!-- Scripts -->
+  <script src="three.min.js"></script>
+  <script src="OrbitControls.js"></script>
+  <script src="catalog_data.js"></script>
+  <script>
+    // --- SPECTRAL COLOR MAPPING ---
+    function getSpectralColor(sp) {
+      if (!sp) return 0xffffff;
+      const s = sp.toUpperCase().trim();
+      if (s.startsWith('O')) return 0x9bb0ff;
+      if (s.startsWith('B')) return 0xbbccff;
+      if (s.startsWith('A')) return 0xf8f9ff;
+      if (s.startsWith('F')) return 0xffffed;
+      if (s.startsWith('G')) return 0xffe899;
+      if (s.startsWith('K')) return 0xffb366;
+      if (s.startsWith('M')) return 0xff5533;
+      if (s.includes('DA') || s.includes('DB') || s.includes('DQ')) return 0xe0ffff; // White dwarf
+      return 0xffffff;
+    }
+
+    // --- APPLICATION STATE ---
+    const STATE = {
+      navMode: 'ORBIT', // 'ORBIT' or 'FLIGHT'
+      coordFrame: 'EQUATORIAL', // 'EQUATORIAL' or 'GALACTIC'
+      selectedStar: null,
+      coreScale: 1.0,
+      gridStep: 50,
+      flightSpeed: 15.0,
+      activeCategory: 'ALL',
+      showGrid: true,
+      showStems: true,
+      showRings: true,
+      showLabels: true,
+      showAxes: true,
+      showSolarSystem: true,
+      solarSpeed: 1.0
+    };
+
+    // --- SCENE SETUP ---
+    const container = document.getElementById('webgl-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x070913, 0.0004);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 8000);
+    camera.position.set(25, 30, 45);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x070913, 1);
+    container.appendChild(renderer.domElement);
+
+    // Orbit Controls
+    const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+    orbitControls.dampingFactor = 0.06;
+    orbitControls.maxDistance = 3500;
+    orbitControls.minDistance = 0.5;
+    orbitControls.target.set(0, 0, 0);
+
+    // Flight Controls State
+    const flightState = {
+      keys: {},
+      speed: 15.0,
+      boostMultiplier: 4.0,
+      rotation: new THREE.Euler(0, 0, 0, 'YXZ'),
+      isDragging: false,
+      lastMouseX: 0,
+      lastMouseY: 0
+    };
+
+    // --- TEXTURES & SPRITES ---
+    function createStarTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      grad.addColorStop(0.15, 'rgba(255, 255, 255, 0.9)');
+      grad.addColorStop(0.35, 'rgba(200, 230, 255, 0.4)');
+      grad.addColorStop(0.7, 'rgba(100, 180, 255, 0.1)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(canvas);
+    }
+    const starTexture = createStarTexture();
+
+    // --- OBJECT GROUPS ---
+    const gridGroup = new THREE.Group();
+    const stemsGroup = new THREE.Group();
+    const ringsGroup = new THREE.Group();
+    const starsGroup = new THREE.Group();
+    const labelsGroup = new THREE.Group();
+    const axesGroup = new THREE.Group();
+    const rulerGroup = new THREE.Group();
+
+    scene.add(gridGroup);
+    scene.add(stemsGroup);
+    scene.add(ringsGroup);
+    scene.add(starsGroup);
+    scene.add(labelsGroup);
+    scene.add(axesGroup);
+    scene.add(rulerGroup);
+
+    // --- AMBIENT PARTICLES (Interstellar dust) ---
+    const dustCount = 800;
+    const dustGeom = new THREE.BufferGeometry();
+    const dustPositions = new Float32Array(dustCount * 3);
+    for (let i = 0; i < dustCount * 3; i += 3) {
+      dustPositions[i] = (Math.random() - 0.5) * 1200;
+      dustPositions[i+1] = (Math.random() - 0.5) * 600;
+      dustPositions[i+2] = (Math.random() - 0.5) * 1200;
+    }
+    dustGeom.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    const dustMat = new THREE.PointsMaterial({
+      size: 1.2,
+      color: 0x3b82f6,
+      transparent: true,
+      opacity: 0.35
+    });
+    const dustPoints = new THREE.Points(dustGeom, dustMat);
+    scene.add(dustPoints);
+
+    // --- BUILD 3D GRID PLANE ---
+    let mainGridHelper = null;
+    function buildGrid(stepSize) {
+      while(gridGroup.children.length > 0) {
+        gridGroup.remove(gridGroup.children[0]);
+      }
+      const gridExtent = 1600; // total grid width in light years
+      const divisions = Math.floor(gridExtent / stepSize);
+      
+      mainGridHelper = new THREE.GridHelper(gridExtent, divisions, 0x00d2ff, 0x1e3a8a);
+      mainGridHelper.material.opacity = 0.35;
+      mainGridHelper.material.transparent = true;
+      gridGroup.add(mainGridHelper);
+    }
+    buildGrid(STATE.gridStep);
+
+    // --- BUILD DISTANCE RINGS ---
+    function buildDistanceRings() {
+      while(ringsGroup.children.length > 0) {
+        ringsGroup.remove(ringsGroup.children[0]);
+      }
+      const radii = [5, 10, 20, 50, 100, 250, 500, 1000];
+      radii.forEach(r => {
+        const curve = new THREE.EllipseCurve(0, 0, r, r, 0, 2 * Math.PI, false, 0);
+        const points = curve.getPoints(90);
+        const ringGeom = new THREE.BufferGeometry().setFromPoints(points);
+        // Rotate so ring lies on XZ plane
+        ringGeom.rotateX(Math.PI / 2);
+        const ringMat = new THREE.LineBasicMaterial({
+          color: 0x00ffff,
+          transparent: true,
+          opacity: r <= 50 ? 0.4 : 0.2
+        });
+        const ringLine = new THREE.Line(ringGeom, ringMat);
+        ringsGroup.add(ringLine);
+      });
+    }
+    buildDistanceRings();
+
+    // --- BUILD 3D AXES WITH LABELS ---
+    function buildAxes() {
+      while(axesGroup.children.length > 0) {
+        axesGroup.remove(axesGroup.children[0]);
+      }
+      const length = 120;
+      // +X (Red/Cyan)
+      const xGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(length,0,0)]);
+      const xLine = new THREE.Line(xGeom, new THREE.LineBasicMaterial({ color: 0xff3366, opacity: 0.7, transparent: true }));
+      axesGroup.add(xLine);
+
+      // +Z (Green) -> Note: in Three.js standard, Y is up, Z is depth.
+      // We map astronomical (X, Y, Z) to Three.js coordinates:
+      // Three.js X = Celestial X
+      // Three.js Y = Celestial Z (height above equatorial plane)
+      // Three.js Z = Celestial Y
+      const yGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,length,0)]);
+      const yLine = new THREE.Line(yGeom, new THREE.LineBasicMaterial({ color: 0x00ffcc, opacity: 0.7, transparent: true }));
+      axesGroup.add(yLine);
+
+      const zGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,length)]);
+      const zLine = new THREE.Line(zGeom, new THREE.LineBasicMaterial({ color: 0x3399ff, opacity: 0.7, transparent: true }));
+      axesGroup.add(zLine);
+    }
+    buildAxes();
+
+    // Coordinate conversion from Database coords to Three.js space:
+    // Equatorial Database: pos_x_ly (Vernal Equinox), pos_y_ly (RA=90), pos_z_ly (North Celestial Pole)
+    // Three.js:
+    // X = pos_x_ly
+    // Y = pos_z_ly (Height above celestial equatorial grid plane!)
+    // Z = pos_y_ly
+    function getStarScenePos(star, frame) {
+      if (frame === 'GALACTIC') {
+        return new THREE.Vector3(star.gal_x_ly, star.gal_z_ly, star.gal_y_ly);
+      }
+      return new THREE.Vector3(star.pos_x_ly, star.pos_z_ly, star.pos_y_ly);
+    }
+
+    // --- POPULATE STARS, STEMS & LABELS ---
+    const starMeshes = [];
+    const stemLines = [];
+    const labelSprites = [];
+
+    // Add THE SUN (Sol) at (0, 0, 0)
+    const sunGeom = new THREE.SphereGeometry(0.5, 32, 32);
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xffe066 });
+    const sunMesh = new THREE.Mesh(sunGeom, sunMat);
+    sunMesh.position.set(0, 0, 0);
+    sunMesh.userData = {
+      isSun: true,
+      common_name: "The Sun (Sol)",
+      bayer_flamsteed: "Sol • Central G2V Star",
+      constellation_full: "Solar System",
+      constellation: "SOL",
+      distance_ly: 0.0,
+      distance_pc: 0.0,
+      spectral_type: "G2V (Yellow Dwarf)",
+      apparent_magnitude: -26.74,
+      absolute_magnitude: 4.83,
+      parallax_mas: 0.0,
+      pos_x_ly: 0.0, pos_y_ly: 0.0, pos_z_ly: 0.0,
+      gal_x_ly: 0.0, gal_y_ly: 0.0, gal_z_ly: 0.0,
+      ra_hms: "Origin (00h 00m 00s)",
+      dec_dms: "Origin (+00° 00' 00\")",
+      significance: "Center of our Solar System and origin [0, 0, 0] of the 3D celestial coordinate grid. Contains 99.86% of the system's mass."
+    };
+    scene.add(sunMesh);
+
+    // Sun sprite glow
+    const sunSpriteMat = new THREE.SpriteMaterial({
+      map: starTexture,
+      color: 0xffd700,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: 0.95
+    });
+    const sunSprite = new THREE.Sprite(sunSpriteMat);
+    sunSprite.scale.set(3.5, 3.5, 1);
+    sunMesh.add(sunSprite);
+
+    // --- BASIC SOLAR SYSTEM SIMULATION (At the Center Origin) ---
+    const solarSystemGroup = new THREE.Group();
+    scene.add(solarSystemGroup);
+
+    const SOLAR_PLANETS = [
+      { name: "Mercury", au: 0.387, r: 0.95, size: 0.09, color: 0xa8a29e, speed: 4.15, type: "Terrestrial (Rocky)", period: "88 days", angle0: 0.8 },
+      { name: "Venus",   au: 0.723, r: 1.45, size: 0.14, color: 0xfef08a, speed: 1.62, type: "Terrestrial (Dense Atmosphere)", period: "225 days", angle0: 2.1 },
+      { name: "Earth",   au: 1.000, r: 2.10, size: 0.16, color: 0x38bdf8, speed: 1.00, type: "Terrestrial (Habitable World)", period: "365.25 days", hasMoon: true, angle0: 3.5 },
+      { name: "Mars",    au: 1.524, r: 2.85, size: 0.12, color: 0xf87171, speed: 0.53, type: "Terrestrial (Red Planet)", period: "687 days", angle0: 4.9 },
+      { name: "Jupiter", au: 5.204, r: 4.10, size: 0.34, color: 0xfb923c, speed: 0.22, type: "Gas Giant (Great Red Spot)", period: "11.86 years", angle0: 0.4 },
+      { name: "Saturn",  au: 9.582, r: 5.50, size: 0.28, color: 0xfde047, speed: 0.13, type: "Gas Giant (Ring System)", period: "29.45 years", hasRings: true, angle0: 1.9 },
+      { name: "Uranus",  au: 19.20, r: 6.90, size: 0.21, color: 0x67e8f9, speed: 0.07, type: "Ice Giant", period: "84 years", angle0: 5.2 },
+      { name: "Neptune", au: 30.05, r: 8.30, size: 0.20, color: 0x60a5fa, speed: 0.04, type: "Ice Giant", period: "164.8 years", angle0: 3.7 }
+    ];
+
+    const planetMeshes = [];
+    const planetLabels = [];
+    let moonMesh = null;
+
+    function buildSolarSystem() {
+      while(solarSystemGroup.children.length > 0) solarSystemGroup.remove(solarSystemGroup.children[0]);
+      planetMeshes.length = 0;
+      planetLabels.length = 0;
+
+      SOLAR_PLANETS.forEach((p, idx) => {
+        // Orbit ring on XZ plane
+        const orbitCurve = new THREE.EllipseCurve(0, 0, p.r, p.r, 0, 2 * Math.PI, false, 0);
+        const orbitPoints = orbitCurve.getPoints(80);
+        const orbitGeom = new THREE.BufferGeometry().setFromPoints(orbitPoints);
+        orbitGeom.rotateX(Math.PI / 2);
+        const orbitMat = new THREE.LineBasicMaterial({
+          color: p.color,
+          transparent: true,
+          opacity: 0.32
+        });
+        const orbitLine = new THREE.Line(orbitGeom, orbitMat);
+        solarSystemGroup.add(orbitLine);
+
+        // Planet Sphere
+        const pGeom = new THREE.SphereGeometry(p.size, 20, 20);
+        const pMat = new THREE.MeshBasicMaterial({ color: p.color });
+        const pMesh = new THREE.Mesh(pGeom, pMat);
+        pMesh.position.set(Math.cos(p.angle0) * p.r, 0, Math.sin(p.angle0) * p.r);
+
+        pMesh.userData = {
+          isPlanet: true,
+          common_name: p.name,
+          bayer_flamsteed: `Sol ${idx + 1} • ${p.type}`,
+          constellation_full: "Solar System",
+          constellation: "SOL",
+          distance_ly: p.au * 0.00001581,
+          distance_pc: (p.au * 0.00001581) / 3.26156,
+          spectral_type: p.type,
+          apparent_magnitude: null,
+          absolute_magnitude: null,
+          parallax_mas: 1000000.0,
+          pos_x_ly: 0.0, pos_y_ly: 0.0, pos_z_ly: 0.0,
+          gal_x_ly: 0.0, gal_y_ly: 0.0, gal_z_ly: 0.0,
+          ra_hms: "Origin (00h 00m 00s)",
+          dec_dms: "Origin (+00° 00' 00\")",
+          significance: `Major planet of the Solar System. Mean orbital radius: ${p.au} AU (~${(p.au * 149.6).toFixed(1)} million km). Orbital period: ${p.period}.`
+        };
+
+        // Saturn's Rings
+        if (p.hasRings) {
+          const ringGeom = new THREE.RingGeometry(p.size * 1.5, p.size * 2.7, 32);
+          ringGeom.rotateX(Math.PI / 2.3);
+          ringGeom.rotateY(0.25);
+          const ringMat = new THREE.MeshBasicMaterial({
+            color: 0xfef08a,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.75
+          });
+          const ringMesh = new THREE.Mesh(ringGeom, ringMat);
+          pMesh.add(ringMesh);
+        }
+
+        // Earth's Moon
+        if (p.hasMoon) {
+          const mGeom = new THREE.SphereGeometry(0.045, 12, 12);
+          const mMat = new THREE.MeshBasicMaterial({ color: 0xd1d5db });
+          moonMesh = new THREE.Mesh(mGeom, mMat);
+          moonMesh.userData = {
+            isPlanet: true,
+            common_name: "The Moon (Luna)",
+            bayer_flamsteed: "Earth I • Natural Satellite",
+            constellation_full: "Solar System",
+            constellation: "SOL",
+            distance_ly: 0.00001581,
+            distance_pc: 0.0000048,
+            spectral_type: "Planetary Satellite",
+            apparent_magnitude: -12.74,
+            absolute_magnitude: null,
+            parallax_mas: 1000000.0,
+            pos_x_ly: 0, pos_y_ly: 0, pos_z_ly: 0,
+            gal_x_ly: 0, gal_y_ly: 0, gal_z_ly: 0,
+            ra_hms: "Earth Orbit",
+            dec_dms: "Earth Orbit",
+            significance: "Earth's only natural satellite. Mean orbital distance from Earth: 384,400 km. Orbital period: 27.3 days."
+          };
+          solarSystemGroup.add(moonMesh);
+        }
+
+        // Planet text label (Canvas Sprite)
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = 48;
+        const ctx = canvas.getContext('2d');
+        ctx.font = 'Bold 18px system-ui, sans-serif';
+        ctx.fillStyle = '#bae6fd';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(p.name, 8, 30);
+
+        const lblTex = new THREE.CanvasTexture(canvas);
+        const lblMat = new THREE.SpriteMaterial({ map: lblTex, transparent: true, opacity: 0.8 });
+        const lblSprite = new THREE.Sprite(lblMat);
+        lblSprite.scale.set(2.4, 0.7, 1);
+        lblSprite.position.set(pMesh.position.x, 0.35, pMesh.position.z);
+        solarSystemGroup.add(lblSprite);
+
+        p.mesh = pMesh;
+        p.label = lblSprite;
+
+        solarSystemGroup.add(pMesh);
+        planetMeshes.push(pMesh);
+        planetLabels.push(lblSprite);
+      });
+    }
+    buildSolarSystem();
+
+    // Star creation
+    function createStars() {
+      // Clear previous
+      while(starsGroup.children.length > 0) starsGroup.remove(starsGroup.children[0]);
+      while(stemsGroup.children.length > 0) stemsGroup.remove(stemsGroup.children[0]);
+      while(labelsGroup.children.length > 0) labelsGroup.remove(labelsGroup.children[0]);
+      starMeshes.length = 0;
+      stemLines.length = 0;
+      labelSprites.length = 0;
+
+      STELLAR_CATALOG.forEach(star => {
+        const pos = getStarScenePos(star, STATE.coordFrame);
+        const colHex = getSpectralColor(star.spectral_type);
+
+        // Core star size derived from absolute magnitude / distance
+        let radius = 0.35;
+        if (star.absolute_magnitude < -4) radius = 0.7;
+        else if (star.absolute_magnitude < 0) radius = 0.55;
+        else if (star.apparent_magnitude < 1.0) radius = 0.5;
+
+        // Star Core Sphere
+        const geom = new THREE.SphereGeometry(radius * STATE.coreScale, 16, 16);
+        const mat = new THREE.MeshBasicMaterial({ color: colHex });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.position.copy(pos);
+        mesh.userData = star;
+
+        // Glowing Star Halo (Billboard Sprite)
+        const haloScale = radius * 4.8 * STATE.coreScale;
+        const spriteMat = new THREE.SpriteMaterial({
+          map: starTexture,
+          color: colHex,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          opacity: 0.85
+        });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(haloScale, haloScale, 1);
+        mesh.add(sprite);
+
+        starsGroup.add(mesh);
+        starMeshes.push(mesh);
+
+        // Vertical Height Stem (Drop line to grid plane Y = 0)
+        const stemGeom = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(pos.x, 0, pos.z),
+          new THREE.Vector3(pos.x, pos.y, pos.z)
+        ]);
+        const stemColor = pos.y >= 0 ? 0x00d2ff : 0xd946ef;
+        const stemMat = new THREE.LineBasicMaterial({
+          color: stemColor,
+          transparent: true,
+          opacity: 0.45
+        });
+        const stemLine = new THREE.Line(stemGeom, stemMat);
+        stemsGroup.add(stemLine);
+        stemLines.push(stemLine);
+
+        // Footprint Ring at (pos.x, 0, pos.z)
+        const footGeom = new THREE.RingGeometry(0.2, 0.35, 16);
+        footGeom.rotateX(-Math.PI / 2);
+        const footMat = new THREE.MeshBasicMaterial({
+          color: stemColor,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.5
+        });
+        const footMesh = new THREE.Mesh(footGeom, footMat);
+        footMesh.position.set(pos.x, 0, pos.z);
+        stemsGroup.add(footMesh);
+
+        // Canvas 2D Text Label
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.font = 'Bold 22px system-ui, sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur = 6;
+        ctx.fillText(star.common_name, 10, 38);
+
+        const lblTex = new THREE.CanvasTexture(canvas);
+        const lblMat = new THREE.SpriteMaterial({
+          map: lblTex,
+          transparent: true,
+          opacity: 0.85
+        });
+        const lblSprite = new THREE.Sprite(lblMat);
+        lblSprite.position.set(pos.x, pos.y + (pos.y >= 0 ? 1.0 : -1.0), pos.z);
+        lblSprite.scale.set(6, 1.5, 1);
+        labelsGroup.add(lblSprite);
+        labelSprites.push(lblSprite);
+      });
+    }
+    createStars();
+
+    // --- ANIMATED INTERPOLATION BETWEEN COORDINATE FRAMES ---
+    let frameTransition = { active: false, progress: 0, fromFrame: 'EQUATORIAL', toFrame: 'GALACTIC' };
+    function switchCoordinateFrame(newFrame) {
+      if (STATE.coordFrame === newFrame) return;
+      STATE.coordFrame = newFrame;
+      // Re-create stars and stems cleanly in new frame
+      createStars();
+      updateVisibility();
+      if (STATE.selectedStar) {
+        showStarTelemetry(STATE.selectedStar);
+      }
+    }
+
+    // --- VISIBILITY TOGGLES ---
+    function updateVisibility() {
+      gridGroup.visible = STATE.showGrid;
+      stemsGroup.visible = STATE.showStems;
+      ringsGroup.visible = STATE.showRings;
+      labelsGroup.visible = STATE.showLabels;
+      axesGroup.visible = STATE.showAxes;
+      solarSystemGroup.visible = STATE.showSolarSystem;
+    }
+
+    // --- INTERACTIVE RAYCASTING (Clicking Stars & Planets) ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    window.addEventListener('pointerdown', (e) => {
+      // Only raycast if left clicked and not interacting with HUD
+      if (e.button !== 0) return;
+      if (e.target.closest('#top-bar') || e.target.closest('#left-panel') || e.target.closest('#telemetry-panel') || e.target.closest('#flight-hud')) {
+        return;
+      }
+
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      
+      const allClickables = starMeshes.concat(planetMeshes, [sunMesh]);
+      if (moonMesh) allClickables.push(moonMesh);
+      const intersects = raycaster.intersectObjects(allClickables);
+
+      if (intersects.length > 0) {
+        const star = intersects[0].object.userData;
+        selectStar(star);
+      }
+    });
+
+    // --- STAR & PLANET SELECTION & TELEMETRY ---
+    function selectStar(star) {
+      STATE.selectedStar = star;
+      showStarTelemetry(star);
+    }
+
+    function showStarTelemetry(star) {
+      const panel = document.getElementById('telemetry-panel');
+      panel.style.display = 'flex';
+
+      document.getElementById('star-name').innerText = star.common_name;
+      document.getElementById('star-bayer').innerText = star.bayer_flamsteed || '—';
+      
+      if (star.distance_ly < 0.001) {
+        if (star.isSun) {
+          document.getElementById('star-dist').innerText = `0.00 ly (Origin)`;
+        } else {
+          const auVal = star.distance_ly / 0.00001581;
+          document.getElementById('star-dist').innerText = `${auVal.toFixed(2)} AU (~${(auVal * 149.6).toFixed(1)}M km)`;
+        }
+      } else {
+        document.getElementById('star-dist').innerText = `${star.distance_ly.toFixed(2)} ly (${star.distance_pc.toFixed(2)} pc)`;
+      }
+
+      document.getElementById('star-spec').innerText = star.spectral_type || 'Unknown';
+      document.getElementById('star-vmag').innerText = star.apparent_magnitude !== null ? star.apparent_magnitude.toFixed(2) : '—';
+      document.getElementById('star-abs').innerText = star.absolute_magnitude !== null ? star.absolute_magnitude.toFixed(2) : '—';
+      document.getElementById('star-const').innerText = `${star.constellation_full} (${star.constellation})`;
+      document.getElementById('star-plx').innerText = star.parallax_mas < 900000 ? `${star.parallax_mas.toFixed(2)} mas` : 'N/A';
+      
+      if (STATE.coordFrame === 'GALACTIC') {
+        document.getElementById('star-coords').innerText = `X(gal): ${star.gal_x_ly.toFixed(2)}, Y(gal): ${star.gal_y_ly.toFixed(2)}, Z(gal): ${star.gal_z_ly.toFixed(2)} ly`;
+      } else {
+        document.getElementById('star-coords').innerText = `X: ${star.pos_x_ly.toFixed(2)}, Y: ${star.pos_y_ly.toFixed(2)}, Z: ${star.pos_z_ly.toFixed(2)} ly`;
+      }
+      
+      document.getElementById('star-celestial').innerText = `RA: ${star.ra_hms} | Dec: ${star.dec_dms}`;
+      document.getElementById('star-notes').innerText = star.significance;
+    }
+
+    document.getElementById('close-telemetry').addEventListener('click', () => {
+      document.getElementById('telemetry-panel').style.display = 'none';
+      STATE.selectedStar = null;
+    });
+
+    // --- SMOOTH CAMERA WARP TO STAR OR PLANET ---
+    let cameraTargetAnim = null;
+    function warpCameraTo(targetPos, offsetDistance = 12) {
+      const startPos = camera.position.clone();
+      const endPos = targetPos.clone().add(new THREE.Vector3(offsetDistance * 0.7, offsetDistance * 0.5, offsetDistance));
+      const startLook = orbitControls.target.clone();
+      const endLook = targetPos.clone();
+
+      let startTime = performance.now();
+      const duration = 1200; // ms
+
+      cameraTargetAnim = function(now) {
+        const elapsed = now - startTime;
+        const t = Math.min(1, elapsed / duration);
+        // Smooth step
+        const ease = t * t * (3 - 2 * t);
+
+        camera.position.lerpVectors(startPos, endPos, ease);
+        orbitControls.target.lerpVectors(startLook, endLook, ease);
+        orbitControls.update();
+
+        if (t < 1) {
+          requestAnimationFrame(cameraTargetAnim);
+        } else {
+          cameraTargetAnim = null;
+        }
+      };
+      requestAnimationFrame(cameraTargetAnim);
+    }
+
+    document.getElementById('btn-fly-to').addEventListener('click', () => {
+      if (!STATE.selectedStar) return;
+      if (STATE.selectedStar.isPlanet) {
+        const pObj = planetMeshes.find(m => m.userData.common_name === STATE.selectedStar.common_name);
+        const pPos = pObj ? pObj.position : new THREE.Vector3(0, 0, 0);
+        warpCameraTo(pPos, 3);
+      } else if (STATE.selectedStar.isSun) {
+        warpCameraTo(new THREE.Vector3(0, 0, 0), 10);
+      } else {
+        const targetPos = getStarScenePos(STATE.selectedStar, STATE.coordFrame);
+        warpCameraTo(targetPos, 8);
+      }
+    });
+
+    document.getElementById('btn-reset-sun').addEventListener('click', () => {
+      warpCameraTo(new THREE.Vector3(0, 0, 0), 35);
+    });
+
+    // --- SEARCH BAR & AUTOCOMPLETE ---
+    const searchInput = document.getElementById('star-search');
+    const searchResults = document.getElementById('search-results');
+
+    searchInput.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      if (!q) {
+        searchResults.style.display = 'none';
+        return;
+      }
+      
+      const solarSearchables = [sunMesh.userData].concat(SOLAR_PLANETS.map((p, idx) => ({
+        common_name: p.name,
+        bayer_flamsteed: `Sol ${idx + 1} • ${p.type}`,
+        constellation: 'SOL',
+        constellation_full: 'Solar System',
+        distance_ly: p.au * 0.00001581,
+        isPlanet: true
+      })));
+      const allEntities = solarSearchables.concat(STELLAR_CATALOG);
+
+      const matches = allEntities.filter(s => 
+        s.common_name.toLowerCase().includes(q) ||
+        (s.bayer_flamsteed && s.bayer_flamsteed.toLowerCase().includes(q)) ||
+        (s.hip_id && `hip ${s.hip_id}`.includes(q)) ||
+        (s.hd_id && `hd ${s.hd_id}`.includes(q)) ||
+        (s.constellation_full && s.constellation_full.toLowerCase().includes(q))
+      ).slice(0, 10);
+
+      if (matches.length === 0) {
+        searchResults.innerHTML = '<div style="padding: 8px 12px; font-size:11px; color:#94a3b8;">No matching objects</div>';
+        searchResults.style.display = 'block';
+        return;
+      }
+
+      searchResults.innerHTML = matches.map(s => {
+        const distStr = s.distance_ly < 0.001 ? (s.isSun ? 'Origin' : `${(s.distance_ly / 0.00001581).toFixed(2)} AU`) : `${s.distance_ly.toFixed(1)} ly`;
+        return `
+        <div class="search-item" data-name="${s.common_name}">
+          <span><b>${s.common_name}</b> <small style="color:var(--text-dim)">(${s.bayer_flamsteed || s.constellation})</small></span>
+          <span style="color:var(--accent-cyan); font-family:monospace;">${distStr}</span>
+        </div>
+        `;
+      }).join('');
+      searchResults.style.display = 'block';
+    });
+
+    searchResults.addEventListener('click', (e) => {
+      const item = e.target.closest('.search-item');
+      if (!item) return;
+      const name = item.getAttribute('data-name');
+      
+      // Check if Sun
+      if (name.includes('Sun') || name === 'The Sun (Sol)') {
+        selectStar(sunMesh.userData);
+        warpCameraTo(new THREE.Vector3(0, 0, 0), 10);
+        searchInput.value = "The Sun (Sol)";
+        searchResults.style.display = 'none';
+        return;
+      }
+
+      // Check if planet
+      const planetObj = planetMeshes.find(m => m.userData.common_name === name);
+      if (planetObj) {
+        selectStar(planetObj.userData);
+        warpCameraTo(planetObj.position, 4);
+        searchInput.value = name;
+        searchResults.style.display = 'none';
+        return;
+      }
+
+      // Check if star
+      const star = STELLAR_CATALOG.find(s => s.common_name === name);
+      if (star) {
+        selectStar(star);
+        const pos = getStarScenePos(star, STATE.coordFrame);
+        warpCameraTo(pos, 10);
+        searchInput.value = star.common_name;
+        searchResults.style.display = 'none';
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search-wrapper')) {
+        searchResults.style.display = 'none';
+      }
+    });
+
+    // --- INTERSTELLAR RULER TOOL ---
+    const rulerSelect1 = document.getElementById('ruler-star-1');
+    const rulerSelect2 = document.getElementById('ruler-star-2');
+    const rulerDisplay = document.getElementById('ruler-display');
+
+    STELLAR_CATALOG.forEach((s, idx) => {
+      const opt1 = document.createElement('option');
+      opt1.value = s.common_name;
+      opt1.text = `${s.common_name} (${s.distance_ly.toFixed(1)} ly)`;
+      rulerSelect1.appendChild(opt1);
+
+      const opt2 = document.createElement('option');
+      opt2.value = s.common_name;
+      opt2.text = `${s.common_name} (${s.distance_ly.toFixed(1)} ly)`;
+      rulerSelect2.appendChild(opt2);
+    });
+    rulerSelect1.value = "Sirius";
+    rulerSelect2.value = "Proxima Centauri";
+
+    let rulerLineMesh = null;
+    function updateRuler() {
+      const s1 = STELLAR_CATALOG.find(s => s.common_name === rulerSelect1.value);
+      const s2 = STELLAR_CATALOG.find(s => s.common_name === rulerSelect2.value);
+      if (!s1 || !s2) return;
+
+      const p1 = getStarScenePos(s1, STATE.coordFrame);
+      const p2 = getStarScenePos(s2, STATE.coordFrame);
+      const distLy = p1.distanceTo(p2);
+      const distPc = distLy / 3.26156;
+
+      rulerDisplay.innerHTML = `Distance: <b>${distLy.toFixed(3)} ly</b> (${distPc.toFixed(3)} pc)`;
+
+      while(rulerGroup.children.length > 0) rulerGroup.remove(rulerGroup.children[0]);
+      const rulerGeom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      const rulerMat = new THREE.LineDashedMaterial({
+        color: 0x00ffcc,
+        dashSize: 1.5,
+        gapSize: 0.8,
+        linewidth: 2
+      });
+      rulerLineMesh = new THREE.Line(rulerGeom, rulerMat);
+      rulerLineMesh.computeLineDistances();
+      rulerGroup.add(rulerLineMesh);
+    }
+    rulerSelect1.addEventListener('change', updateRuler);
+    rulerSelect2.addEventListener('change', updateRuler);
+    updateRuler();
+
+    // --- NAVIGATION MODE TOGGLE (ORBIT vs FLIGHT) ---
+    const btnModeOrbit = document.getElementById('btn-mode-orbit');
+    const btnModeFlight = document.getElementById('btn-mode-flight');
+    const flightHud = document.getElementById('flight-hud');
+
+    btnModeOrbit.addEventListener('click', () => {
+      STATE.navMode = 'ORBIT';
+      btnModeOrbit.classList.add('active');
+      btnModeFlight.classList.remove('active');
+      flightHud.style.display = 'none';
+      orbitControls.enabled = true;
+    });
+
+    btnModeFlight.addEventListener('click', () => {
+      STATE.navMode = 'FLIGHT';
+      btnModeFlight.classList.add('active');
+      btnModeOrbit.classList.remove('active');
+      flightHud.style.display = 'flex';
+      orbitControls.enabled = false;
+    });
+
+    // --- COORDINATE FRAME TOGGLE ---
+    const btnFrameEq = document.getElementById('btn-frame-eq');
+    const btnFrameGal = document.getElementById('btn-frame-gal');
+
+    btnFrameEq.addEventListener('click', () => {
+      btnFrameEq.classList.add('active');
+      btnFrameGal.classList.remove('active');
+      switchCoordinateFrame('EQUATORIAL');
+      updateRuler();
+    });
+
+    btnFrameGal.addEventListener('click', () => {
+      btnFrameGal.classList.add('active');
+      btnFrameEq.classList.remove('active');
+      switchCoordinateFrame('GALACTIC');
+      updateRuler();
+    });
+
+    // --- CAMERA VIEW PRESETS ---
+    document.getElementById('view-solar-system').addEventListener('click', () => {
+      warpCameraTo(new THREE.Vector3(0, 7, 14), 14);
+    });
+    document.getElementById('view-sun-close').addEventListener('click', () => {
+      warpCameraTo(new THREE.Vector3(0, 0, 0), 16);
+    });
+    document.getElementById('view-top-down').addEventListener('click', () => {
+      const topPos = new THREE.Vector3(0, 160, 0);
+      warpCameraTo(new THREE.Vector3(0, 0, 0), 160);
+    });
+    document.getElementById('view-side-x').addEventListener('click', () => {
+      camera.position.set(200, 0, 0);
+      orbitControls.target.set(0, 0, 0);
+      orbitControls.update();
+    });
+    document.getElementById('view-overview').addEventListener('click', () => {
+      warpCameraTo(new THREE.Vector3(0, 0, 0), 1200);
+    });
+
+    // --- CHECKBOX TOGGLES ---
+    document.getElementById('chk-solar').addEventListener('change', (e) => {
+      STATE.showSolarSystem = e.target.checked;
+      updateVisibility();
+    });
+    document.getElementById('chk-grid').addEventListener('change', (e) => {
+      STATE.showGrid = e.target.checked;
+      updateVisibility();
+    });
+    document.getElementById('chk-stems').addEventListener('change', (e) => {
+      STATE.showStems = e.target.checked;
+      updateVisibility();
+    });
+    document.getElementById('chk-rings').addEventListener('change', (e) => {
+      STATE.showRings = e.target.checked;
+      updateVisibility();
+    });
+    document.getElementById('chk-labels').addEventListener('change', (e) => {
+      STATE.showLabels = e.target.checked;
+      updateVisibility();
+    });
+    document.getElementById('chk-axes').addEventListener('change', (e) => {
+      STATE.showAxes = e.target.checked;
+      updateVisibility();
+    });
+
+    // --- SLIDERS ---
+    const rngOrbitSpeed = document.getElementById('rng-orbit-speed');
+    rngOrbitSpeed.addEventListener('input', (e) => {
+      STATE.solarSpeed = parseFloat(e.target.value);
+      document.getElementById('lbl-orbit-speed').innerText = `${STATE.solarSpeed.toFixed(1)}x`;
+    });
+
+    const rngScale = document.getElementById('rng-scale');
+    rngScale.addEventListener('input', (e) => {
+      STATE.coreScale = parseFloat(e.target.value);
+      document.getElementById('lbl-scale').innerText = `${STATE.coreScale.toFixed(1)}x`;
+      createStars();
+    });
+
+    const rngGridSize = document.getElementById('rng-grid-size');
+    rngGridSize.addEventListener('input', (e) => {
+      STATE.gridStep = parseInt(e.target.value);
+      document.getElementById('lbl-grid-size').innerText = `${STATE.gridStep} ly`;
+      buildGrid(STATE.gridStep);
+    });
+
+    // --- CATEGORY PILLS ---
+    const catContainer = document.getElementById('category-pills');
+    catContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      catContainer.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const cat = btn.getAttribute('data-cat');
+      STATE.activeCategory = cat;
+
+      starMeshes.forEach(mesh => {
+        const star = mesh.userData;
+        let match = true;
+        if (cat === 'Nearest') match = star.distance_ly < 15.0;
+        else if (cat === 'Brightest') match = star.category.includes('Brightest');
+        else if (cat === 'Navigational') match = star.category.includes('Navigational') || star.category.includes('Polar');
+        else if (cat === 'Extreme') match = star.category.includes('Extreme') || star.category.includes('Prototype');
+
+        mesh.visible = match;
+      });
+    });
+
+    // --- FLIGHT NAVIGATION SYSTEM (SPACESHIP DRONE CONTROLS) ---
+    window.addEventListener('keydown', (e) => {
+      flightState.keys[e.code] = true;
+    });
+    window.addEventListener('keyup', (e) => {
+      flightState.keys[e.code] = false;
+    });
+
+    renderer.domElement.addEventListener('mousedown', (e) => {
+      if (STATE.navMode === 'FLIGHT' && e.button === 0) {
+        flightState.isDragging = true;
+        flightState.lastMouseX = e.clientX;
+        flightState.lastMouseY = e.clientY;
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      flightState.isDragging = false;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (STATE.navMode === 'FLIGHT' && flightState.isDragging) {
+        const deltaX = e.clientX - flightState.lastMouseX;
+        const deltaY = e.clientY - flightState.lastMouseY;
+        flightState.lastMouseX = e.clientX;
+        flightState.lastMouseY = e.clientY;
+
+        const sensitivity = 0.003;
+        camera.rotation.y -= deltaX * sensitivity;
+        camera.rotation.x -= deltaY * sensitivity;
+      }
+    });
+
+    const clock = new THREE.Clock();
+
+    function updateFlightNavigation(delta) {
+      if (STATE.navMode !== 'FLIGHT') return;
+
+      const keys = flightState.keys;
+      let moveSpeed = flightState.speed;
+      if (keys['ShiftLeft'] || keys['ShiftRight']) {
+        moveSpeed *= flightState.boostMultiplier;
+      }
+
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+
+      const moveDelta = new THREE.Vector3();
+      if (keys['KeyW']) moveDelta.add(forward);
+      if (keys['KeyS']) moveDelta.sub(forward);
+      if (keys['KeyD']) moveDelta.add(right);
+      if (keys['KeyA']) moveDelta.sub(right);
+      if (keys['Space']) moveDelta.add(camera.up);
+      if (keys['KeyC']) moveDelta.sub(camera.up);
+
+      if (moveDelta.lengthSq() > 0) {
+        moveDelta.normalize().multiplyScalar(moveSpeed * delta);
+        camera.position.add(moveDelta);
+      }
+
+      // Update Cockpit Telemetry HUD
+      const speedDisplay = moveDelta.lengthSq() > 0 ? (moveSpeed).toFixed(1) : "0.0";
+      document.getElementById('hud-speed').innerText = speedDisplay;
+      document.getElementById('hud-x').innerText = camera.position.x.toFixed(1);
+      document.getElementById('hud-y').innerText = camera.position.y.toFixed(1);
+      document.getElementById('hud-z').innerText = camera.position.z.toFixed(1);
+
+      const angleDeg = Math.round((camera.rotation.y * 180 / Math.PI) % 360);
+      document.getElementById('hud-heading').innerText = `${angleDeg < 0 ? angleDeg + 360 : angleDeg}°`;
+    }
+
+    // --- MAIN RENDER LOOP ---
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+
+      if (STATE.navMode === 'ORBIT') {
+        orbitControls.update();
+      } else {
+        updateFlightNavigation(delta);
+      }
+
+      // Orbital Animation for the Basic Solar System
+      if (STATE.showSolarSystem) {
+        const simTime = clock.getElapsedTime() * STATE.solarSpeed;
+        const camDist = camera.position.length();
+
+        SOLAR_PLANETS.forEach(p => {
+          if (!p.mesh) return;
+          const angle = p.angle0 + simTime * p.speed * 0.35;
+          p.mesh.position.x = Math.cos(angle) * p.r;
+          p.mesh.position.z = Math.sin(angle) * p.r;
+          p.mesh.rotation.y += 0.02;
+
+          // Update label position and distance fading
+          if (p.label) {
+            p.label.position.set(p.mesh.position.x, 0.4, p.mesh.position.z);
+            if (camDist > 45 || !STATE.showLabels) {
+              p.label.material.opacity = 0;
+            } else {
+              p.label.material.opacity = Math.max(0, 0.85 * (1 - (camDist - 25) / 20));
+            }
+          }
+
+          // Update Moon around Earth
+          if (p.hasMoon && moonMesh) {
+            const moonAngle = simTime * 3.5;
+            moonMesh.position.set(
+              p.mesh.position.x + Math.cos(moonAngle) * 0.35,
+              0.05,
+              p.mesh.position.z + Math.sin(moonAngle) * 0.35
+            );
+          }
+        });
+      }
+
+      // Slowly rotate dust background
+      dustPoints.rotation.y += 0.0001;
+
+      // Smart distance fading for labels based on camera distance
+      if (STATE.showLabels) {
+        const camPos = camera.position;
+        labelSprites.forEach(sprite => {
+          const dist = camPos.distanceTo(sprite.position);
+          // Fade labels when zoomed far out
+          if (dist > 350) {
+            sprite.material.opacity = Math.max(0, 1 - (dist - 350) / 250);
+          } else {
+            sprite.material.opacity = 0.85;
+          }
+        });
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // --- WINDOW RESIZE ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
